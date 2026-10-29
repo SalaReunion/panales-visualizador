@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Pañales - Visualizador</title>
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- ApexCharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+    <!-- Inline styles to bypass local browser cache -->
+    <style>
+        .kpi-grid {
+            grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)) !important;
+        }
+        .kpi-card {
+            padding: 20px !important;
+            gap: 12px !important;
+        }
+        .kpi-content {
+            min-width: 0 !important;
+            flex: 1 !important;
+        }
+        .kpi-value {
+            font-size: 1.8rem !important;
+            white-space: nowrap !important;
+        }
+        #kpi-costo .kpi-value {
+            font-size: 1.55rem !important;
+        }
+        .kpi-icon-wrapper {
+            flex-shrink: 0 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="header-logo">
+                <div class="logo-icon-container">
+                    <i data-lucide="package" class="logo-icon"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>Control de Pañales</h1>
+                    <p>Dashboard de Gestión de Autorizaciones y Entregas</p>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <div class="db-status" id="db-status-indicator">
+                    <span class="status-dot green"></span>
+                    <span class="status-text" id="status-label">Cargando base...</span>
+                    <span class="status-text" id="last-updated-label" style="font-size: 0.75rem; color: #94a3b8; font-weight: 300; margin-left: 8px; border-left: 1px solid rgba(255, 255, 255, 0.15); padding-left: 8px;">Actualizado: -</span>
+                </div>
+                <button class="btn btn-admin-logs" id="btn-open-audit-logs" style="display: none;" title="Ver historial de ingresos de usuarios">
+                    <i data-lucide="shield-check"></i>
+                    <span>Historial Accesos</span>
+                </button>
+                <div class="user-profile-widget" id="user-profile-widget">
+                    <div class="user-profile-icon"><i data-lucide="user"></i></div>
+                    <div class="user-profile-info">
+                        <span class="user-profile-name" id="current-user-name">Usuario</span>
+                        <span class="user-profile-role" id="current-user-role">Operador</span>
+                    </div>
+                </div>
+                <button class="btn btn-logout" id="btn-logout" title="Cerrar Sesión">
+                    <i data-lucide="log-out"></i>
+                    <span>Salir</span>
+                </button>
+                <button class="btn btn-sync" id="btn-sync-db" title="Actualizar datos desde base de datos">
+                    <i data-lucide="refresh-cw" class="icon-spin-hover" id="sync-icon"></i>
+                    <span>Actualizar Datos</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- KPI SUMMARY CARDS -->
+        <section class="kpi-grid">
+            <!-- Card 1: Total Expedientes -->
+            <div class="kpi-card" id="kpi-expedientes">
+                <div class="kpi-content">
+                    <span class="kpi-label">Total Expedientes</span>
+                    <span class="kpi-value" id="kpi-total-exp">0</span>
+                    <span class="kpi-meta" id="kpi-meta-exp">En el periodo seleccionado</span>
+                </div>
+                <div class="kpi-icon-wrapper bg-blue">
+                    <i data-lucide="file-text"></i>
+                </div>
+            </div>
+
+            <!-- Card 2: Total Pañales -->
+            <div class="kpi-card" id="kpi-panales">
+                <div class="kpi-content">
+                    <span class="kpi-label">Total Pañales Autorizados</span>
+                    <span class="kpi-value" id="kpi-total-units">0</span>
+                    <span class="kpi-meta" id="kpi-meta-units">Unidades entregadas</span>
+                </div>
+                <div class="kpi-icon-wrapper bg-emerald">
+                    <i data-lucide="shield-check"></i>
+                </div>
+            </div>
+
+            <!-- Card 3: Pacientes Únicos -->
+            <div class="kpi-card" id="kpi-pacientes">
+                <div class="kpi-content">
+                    <span class="kpi-label">Pacientes Únicos</span>
+                    <span class="kpi-value" id="kpi-total-patients">0</span>
+                    <span class="kpi-meta" id="kpi-meta-patients">Con solicitudes cargadas</span>
+                </div>
+                <div class="kpi-icon-wrapper bg-purple">
+                    <i data-lucide="users"></i>
+                </div>
+            </div>
+
+            <!-- Card 4: Importe Total Autorizado -->
+            <div class="kpi-card" id="kpi-costo">
+                <div class="kpi-content">
+                    <span class="kpi-label">Importe Total Autorizado</span>
+                    <span class="kpi-value" id="kpi-total-cost">$ 0</span>
+                    <span class="kpi-meta" id="kpi-meta-cost">Monto estimado aprobado</span>
+                </div>
+                <div class="kpi-icon-wrapper bg-orange">
+                    <i data-lucide="dollar-sign"></i>
+                </div>
+            </div>
+
+            <!-- Card 4: Distribución de Estados -->
+            <div class="kpi-card" id="kpi-estados">
+                <div class="kpi-content" style="width: 100%;">
+                    <span class="kpi-label">Estados de Trámite</span>
+                    <div class="status-summary-bar">
+                        <div class="bar-segment approved" id="bar-approved" style="width: 0%;" title="Aprobados"></div>
+                        <div class="bar-segment pending" id="bar-pending" style="width: 0%;" title="Pendientes"></div>
+                        <div class="bar-segment rejected" id="bar-rejected" style="width: 0%;" title="Rechazados"></div>
+                    </div>
+                    <div class="status-legends">
+                        <div class="legend-item"><span class="dot approved"></span><span id="txt-approved">Aprobados: 0</span></div>
+                        <div class="legend-item"><span class="dot pending"></span><span id="txt-pending">Pendientes: 0</span></div>
+                        <div class="legend-item"><span class="dot rejected"></span><span id="txt-rejected">Rechazados: 0</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CHARTS SECTION -->
+        <section class="charts-grid">
+            <!-- Chart 1: Tendencia Mensual -->
+            <div class="chart-container" id="chart-container-trend">
+                <div class="chart-header">
+                    <h3>Tendencia de Solicitudes y Estados</h3>
+                    <p>Evolución de trámites por periodo mensual</p>
+                </div>
+                <div class="chart-body">
+                    <div id="chart-trend"></div>
+                </div>
+            </div>
+
+            <!-- Chart 2: Top Centros Médicos -->
+            <div class="chart-container" id="chart-container-centers">
+                <div class="chart-header">
+                    <h3>Top 5 Centros Médicos</h3>
+                    <p>Distribución de solicitudes por centro médico</p>
+                </div>
+                <div class="chart-body">
+                    <div id="chart-centers"></div>
+                </div>
+            </div>
+
+            <!-- Chart 3: Distribución Obras Sociales -->
+            <div class="chart-container" id="chart-container-obras">
+                <div class="chart-header">
+                    <h3>Distribución por Obra Social</h3>
+                    <p>Porcentaje de solicitudes registradas</p>
+                </div>
+                <div class="chart-body">
+                    <div id="chart-obras"></div>
+                </div>
+            </div>
+
+            <!-- Chart 4: Tendencia por Categoría -->
+            <div class="chart-container" id="chart-container-category-trend">
+                <div class="chart-header">
+                    <h3>Tendencia por Categoría</h3>
+                    <p>Volumen de Pañales vs Asignaciones por periodo</p>
+                </div>
+                <div class="chart-body">
+                    <div id="chart-category-trend"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FILTER BAR SECTION -->
+        <section class="filter-section">
+            <div class="section-title-bar">
+                <i data-lucide="sliders-horizontal" class="section-icon"></i>
+                <h2>Búsqueda y Filtros</h2>
+            </div>
+            
+            <div class="filters-grid">
+                <!-- Buscador de Afiliado / Expediente -->
+                <div class="filter-control search-control">
+                    <label for="search-input">Buscar Afiliado / Expediente</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="search" class="search-icon"></i>
+                        <input type="text" id="search-input" placeholder="Nombre, CUIL, Hist. Clínica o Nº Expediente...">
+                        <button class="clear-search-btn" id="btn-clear-search" style="display: none;">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filtro Año -->
+                <div class="filter-control">
+                    <label for="filter-year">Año</label>
+                    <select id="filter-year">
+                        <option value="">Todos los años</option>
+                    </select>
+                </div>
+
+                <!-- Filtro Periodo -->
+                <div class="filter-control">
+                    <label for="filter-period">Período (Mes)</label>
+                    <select id="filter-period">
+                        <option value="">Todos los períodos</option>
+                    </select>
+                </div>
+
+                <!-- Filtro Centro Médico -->
+                <div class="filter-control">
+                    <label for="filter-sucursal">Centro Médico</label>
+                    <select id="filter-sucursal">
+                        <option value="">Todos los centros médicos</option>
+                    </select>
+                </div>
+
+                <!-- Filtro Obra Social -->
+                <div class="filter-control">
+                    <label for="filter-obra-social">Obra Social</label>
+                    <select id="filter-obra-social">
+                        <option value="">Todas</option>
+                    </select>
+                </div>
+
+                <!-- Filtro Estado -->
+                <div class="filter-control">
+                    <label for="filter-status">Estado</label>
+                    <select id="filter-status">
+                        <option value="">Todos los estados</option>
+                        <option value="Aprobado">Aprobado</option>
+                        <option value="Pendiente">Pendiente</option>
+                        <option value="Rechazado">Rechazado</option>
+                    </select>
+                </div>
+
+                <!-- Filtro Evento -->
+                <div class="filter-control">
+                    <label for="filter-evento">Evento</label>
+                    <select id="filter-evento">
+                        <option value="">Todos los eventos</option>
+                    </select>
+                </div>
+
+                <!-- Filtro Categoría -->
+                <div class="filter-control">
+                    <label for="filter-category">Categoría</label>
+                    <select id="filter-category">
+                        <option value="">Todas las categorías</option>
+                        <option value="Pañales">Pañales</option>
+                        <option value="Asignacion">Asignación Económica</option>
+                    </select>
+                </div>
+
+                <!-- Filtro Troqueles (Multiselect Personalizado) -->
+                <div class="filter-control select-multiselect" id="multiselect-troqueles-container">
+                    <label>Troqueles</label>
+                    <div class="multiselect-dropdown" id="troqueles-dropdown-btn">
+                        <span class="multiselect-label" id="troqueles-selected-label">Todos los troqueles</span>
+                        <i data-lucide="chevron-down" class="dropdown-arrow"></i>
+                    </div>
+                    <div class="multiselect-panel" id="troqueles-dropdown-panel" style="display: none;">
+                        <div class="multiselect-search-box">
+                            <i data-lucide="search" class="search-mini-icon"></i>
+                            <input type="text" id="troqueles-search-input" placeholder="Buscar troquel...">
+                        </div>
+                        <div class="multiselect-actions-row">
+                            <button type="button" id="btn-troqueles-select-all" class="multiselect-action-btn">Todos</button>
+                            <button type="button" id="btn-troqueles-clear-all" class="multiselect-action-btn">Limpiar</button>
+                        </div>
+                        <ul class="multiselect-options-list" id="troqueles-options-ul">
+                            <!-- Opciones cargadas dinámicamente -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="filter-actions">
+                <div class="filter-buttons">
+                    <button class="btn btn-outline" id="btn-reset-filters">
+                        <i data-lucide="rotate-ccw"></i>
+                        <span>Restablecer Filtros</span>
+                    </button>
+                    <button class="btn btn-sync" id="btn-export-excel" style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 14px rgba(16, 185, 129, 0.2);" title="Exportar registros filtrados a formato Excel">
+                        <i data-lucide="download"></i>
+                        <span>Exportar a Excel</span>
+                    </button>
+                </div>
+                <div class="results-count" id="txt-results-count">
+                    Mostrando 0 de 0 registros
+                </div>
+            </div>
+        </section>
+
+        <!-- EXPLORER SECTION (SPLIT SCREEN) -->
+        <section class="explorer-grid">
+            <!-- Left Side: Patients List -->
+            <div class="panel list-panel">
+                <div class="panel-header">
+                    <h3>Pacientes que cumplen con los filtros</h3>
+                </div>
+                <div class="panel-body">
+                    <ul class="patient-list" id="patient-ul-list">
+                        <li class="list-placeholder">
+                            <i data-lucide="user-search"></i>
+                            <p>Cargando lista de pacientes...</p>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Right Side: Selected Patient Details Card -->
+            <div class="panel detail-panel" id="patient-detail-panel">
+                <div class="panel-header detail-header">
+                    <h3>Detalle de Afiliado Seleccionado</h3>
+                </div>
+                <div class="panel-body">
+                    <div class="patient-detail-container scrollable-y" id="patient-detail-body">
+                        <!-- Placeholder inicial -->
+                        <div class="detail-placeholder">
+                            <i data-lucide="hand" class="placeholder-icon"></i>
+                            <h4>Selecciona un paciente</h4>
+                            <p>Haz clic en un paciente de la lista de la izquierda para ver su historial completo de expedientes, plan, autorizaciones y pañales asignados.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TOAST / NOTIFICATION -->
+        <div class="toast-container" id="toast-msg">
+            <i data-lucide="info" id="toast-icon"></i>
+            <span id="toast-text">Notificación</span>
+        </div>
+
+        <!-- FOOTER -->
+        <footer class="app-footer">
+            <p>&copy; 2026 - Sistema de Control de Pañales Interno. Todos los derechos reservados.</p>
+            <p class="server-info">Servidor corriendo localmente. Los datos se actualizan a demanda.</p>
+        </footer>
+    </div>
+
+    
+    <!-- MODAL DE AUDITORÍA DE INGRESOS (HISTORIAL DE ACCESOS) -->
+    <div class="modal-overlay" id="audit-modal-overlay">
+        <div class="modal-content-card">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <div class="modal-title-icon">
+                        <i data-lucide="shield-check"></i>
+                    </div>
+                    <div>
+                        <h2 id="modal-main-title">Panel de Administración</h2>
+                        <p id="modal-main-desc">Historial de accesos, auditoría y blanqueo de contraseñas de usuarios</p>
+                    </div>
+                </div>
+                <button class="btn-close-modal" id="btn-close-audit-modal" title="Cerrar ventana">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+
+            <!-- Pestañas de Navegación del Modal -->
+            <div class="modal-tabs">
+                <button class="modal-tab-btn active" id="tab-btn-logs" data-tab="logs">
+                    <i data-lucide="shield-check"></i>
+                    <span>Historial de Accesos</span>
+                </button>
+                <button class="modal-tab-btn" id="tab-btn-users" data-tab="users">
+                    <i data-lucide="key-round"></i>
+                    <span>Gestión de Usuarios y Claves</span>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <!-- PANEL 1: HISTORIAL DE ACCESOS -->
+                <div class="modal-tab-pane" id="pane-logs">
+                    <!-- Estadísticas de Ingresos -->
+                    <div class="modal-stats-grid">
+                        <div class="modal-stat-card">
+                            <div class="stat-info">
+                                <span class="stat-label">Ingresos Exitosos</span>
+                                <span class="stat-num" id="stat-total-exitosos">0</span>
+                            </div>
+                            <div class="stat-icon green"><i data-lucide="user-check"></i></div>
+                        </div>
+                        <div class="modal-stat-card">
+                            <div class="stat-info">
+                                <span class="stat-label">Usuarios Únicos</span>
+                                <span class="stat-num" id="stat-usuarios-unicos">0</span>
+                            </div>
+                            <div class="stat-icon blue"><i data-lucide="users"></i></div>
+                        </div>
+                        <div class="modal-stat-card">
+                            <div class="stat-info">
+                                <span class="stat-label">Intentos Fallidos</span>
+                                <span class="stat-num" id="stat-total-fallidos">0</span>
+                            </div>
+                            <div class="stat-icon red"><i data-lucide="user-x"></i></div>
+                        </div>
+                    </div>
+
+                    <!-- Filtros del Modal -->
+                    <div class="modal-filter-bar" style="margin-top: 18px;">
+                        <div class="modal-filter-inputs">
+                            <div class="modal-search-wrapper">
+                                <i data-lucide="search"></i>
+                                <input type="text" id="modal-search-input" placeholder="Buscar por usuario o IP...">
+                            </div>
+                            <select id="modal-filter-status">
+                                <option value="TODOS">Todos los estados</option>
+                                <option value="EXITOSO">Solo Exitosos</option>
+                                <option value="FALLIDO">Solo Fallidos</option>
+                            </select>
+                        </div>
+                        <div class="modal-actions">
+                            <a class="btn btn-outline btn-sm" id="btn-export-audit-csv" href="/api/admin/export-logs" download="auditoria_ingresos.csv" style="text-decoration: none;">
+                                <i data-lucide="download"></i>
+                                <span>Descargar CSV</span>
+                            </a>
+                            <button class="btn btn-sync btn-sm" id="btn-refresh-audit-logs">
+                                <i data-lucide="refresh-cw"></i>
+                                <span>Actualizar</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Registros -->
+                    <div class="modal-table-container scrollable-y" style="margin-top: 16px;">
+                        <table class="audit-table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha y Hora</th>
+                                    <th>Usuario</th>
+                                    <th>Rol</th>
+                                    <th>Estado</th>
+                                    <th>Dirección IP</th>
+                                    <th>Navegador / Dispositivo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-table-body">
+                                <tr>
+                                    <td colspan="6" style="text-align: center; padding: 24px; color: #94a3b8;">
+                                        Cargando historial de accesos...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- PANEL 2: GESTIÓN DE USUARIOS Y BLANQUEO DE CLAVES -->
+                <div class="modal-tab-pane" id="pane-users" style="display: none;">
+                    <div class="modal-filter-bar">
+                        <div class="modal-filter-inputs">
+                            <div class="modal-search-wrapper">
+                                <i data-lucide="search"></i>
+                                <input type="text" id="user-search-input" placeholder="Buscar usuario...">
+                            </div>
+                        </div>
+                        <div class="modal-actions">
+                            <button class="btn btn-sync btn-sm" id="btn-refresh-users">
+                                <i data-lucide="refresh-cw"></i>
+                                <span>Actualizar Lista</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="modal-table-container scrollable-y" style="margin-top: 16px;">
+                        <table class="audit-table">
+                            <thead>
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Nombre Completo</th>
+                                    <th>Rol</th>
+                                    <th>Fecha Alta</th>
+                                    <th style="text-align: right;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-table-body">
+                                <tr>
+                                    <td colspan="5" style="text-align: center; padding: 24px; color: #94a3b8;">
+                                        Cargando usuarios...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script de lógica -->
+    
+    <script src="app.js"></script>
+</body>
+</html>
