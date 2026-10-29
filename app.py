@@ -5,6 +5,7 @@ import datetime
 import csv
 import io
 import json
+import gzip
 from functools import wraps
 from flask import (
     Flask, request, jsonify, render_template_string,
@@ -24,59 +25,118 @@ DB_PATH = os.path.join(BASE_DIR, "auth.db")
 TZ_AR = datetime.timezone(datetime.timedelta(hours=-3))
 
 def get_now_ar():
+    """Retorna la fecha y hora actual en zona horaria de Buenos Aires (UTC-3)."""
     return datetime.datetime.now(TZ_AR).strftime("%Y-%m-%d %H:%M:%S")
 
+# ==============================================================================
+# CONEXIÓN A BASE DE DATOS (POSTGRESQL EN RENDER O SQLITE EN LOCAL)
+# ==============================================================================
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if DATABASE_URL and DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# ==============================================================================
-# BASE DE DATOS Y AUTENTICACIÓN
-# ==============================================================================
+def is_postgres():
+    return bool(DATABASE_URL)
+
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if is_postgres():
+        import psycopg2
+        import psycopg2.extras
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+def execute_query(conn, query, params=None):
+    """Ejecuta una consulta SQL adaptando el placeholder (?, %s) y devuelve cursor."""
+    if is_postgres():
+        import psycopg2.extras
+        query_sql = query.replace('?', '%s')
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    else:
+        query_sql = query
+        cursor = conn.cursor()
+    
+    if params:
+        cursor.execute(query_sql, params)
+    else:
+        cursor.execute(query_sql)
+    return cursor
+
+def get_scalar(cursor):
+    """Extrae el primer valor de una consulta de conteo o agregado."""
+    row = cursor.fetchone()
+    if not row:
+        return 0
+    if isinstance(row, dict):
+        return list(row.values())[0]
+    return row[0]
 
 def init_db():
     with get_db() as conn:
-        cursor = conn.cursor()
-        
-        # Tabla de Usuarios
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                full_name TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'user',
-                created_at TEXT NOT NULL
-            )
-        """)
-        
-        # Tabla de Auditoría de Ingresos (Historial de accesos)
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS audit_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT NOT NULL,
-                role TEXT,
-                login_time TEXT NOT NULL,
-                ip_address TEXT,
-                user_agent TEXT,
-                status TEXT NOT NULL,
-                details TEXT
-            )
-        """)
-        
-        # Crear usuarios iniciales por defecto si no existen
-        cursor.execute("SELECT COUNT(*) FROM users")
-        if cursor.fetchone()[0] == 0:
+        if is_postgres():
+            print("Conectado a PostgreSQL persistente en la nube...")
+            execute_query(conn, """
+                CREATE TABLE IF NOT EXISTS users (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(100) UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    full_name TEXT NOT NULL,
+                    role VARCHAR(50) NOT NULL DEFAULT 'user',
+                    created_at VARCHAR(50) NOT NULL
+                )
+            """)
+            execute_query(conn, """
+                CREATE TABLE IF NOT EXISTS audit_logs (
+                    id SERIAL PRIMARY KEY,
+                    username VARCHAR(100) NOT NULL,
+                    role VARCHAR(50),
+                    login_time VARCHAR(50) NOT NULL,
+                    ip_address VARCHAR(100),
+                    user_agent TEXT,
+                    status VARCHAR(50) NOT NULL,
+                    details TEXT
+                )
+            """)
+        else:
+            execute_query(conn, """
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    full_name TEXT NOT NULL,
+                    role TEXT NOT NULL DEFAULT 'user',
+                    created_at TEXT NOT NULL
+                )
+            """)
+            execute_query(conn, """
+                CREATE TABLE IF NOT EXISTS audit_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT NOT NULL,
+                    role TEXT,
+                    login_time TEXT NOT NULL,
+                    ip_address TEXT,
+                    user_agent TEXT,
+                    status TEXT NOT NULL,
+                    details TEXT
+                )
+            """)
+
+        cur = execute_query(conn, "SELECT COUNT(*) FROM users")
+        if get_scalar(cur) == 0:
+            now_str = get_now_ar()
             default_users = [
-                ("admin", generate_password_hash("admin2026"), "Administrador del Sistema", "admin", get_now_ar())
+                ("admin", generate_password_hash("admin2026"), "Administrador del Sistema", "admin", now_str)
             ]
-            cursor.executemany(
-                "INSERT INTO users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, ?, ?)",
-                default_users
-            )
+            for u in default_users:
+                execute_query(
+                    conn,
+                    "INSERT INTO users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, ?, ?)",
+                    u
+                )
             print("Usuario inicial creado: admin (admin2026) con hora de Buenos Aires")
-        
         conn.commit()
 
 init_db()
@@ -123,8 +183,7 @@ def api_login():
         return jsonify({"success": False, "message": "Por favor complete usuario y contraseña."}), 400
 
     with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE LOWER(username) = ?", (username,))
+        cursor = execute_query(conn, "SELECT * FROM users WHERE LOWER(username) = ?", (username,))
         user = cursor.fetchone()
 
         if user and check_password_hash(user['password_hash'], password):
@@ -135,7 +194,7 @@ def api_login():
             session['user_id'] = user['id']
 
             # Registrar log de auditoría EXITOSO
-            cursor.execute("""
+            execute_query(conn, """
                 INSERT INTO audit_logs (username, role, login_time, ip_address, user_agent, status, details)
                 VALUES (?, ?, ?, ?, ?, 'EXITOSO', 'Ingreso correcto al sistema')
             """, (user['username'], user['role'], now_ar, ip, ua))
@@ -152,7 +211,7 @@ def api_login():
             })
         else:
             # Registrar intento FALLIDO
-            cursor.execute("""
+            execute_query(conn, """
                 INSERT INTO audit_logs (username, role, login_time, ip_address, user_agent, status, details)
                 VALUES (?, ?, ?, ?, ?, 'FALLIDO', 'Contraseña incorrecta o usuario inexistente')
             """, (username, 'desconocido', now_ar, ip, ua))
@@ -180,28 +239,26 @@ def api_register():
         return jsonify({"success": False, "message": "La contraseña debe tener al menos 4 caracteres."}), 400
 
     with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM users WHERE LOWER(username) = ?", (username,))
+        cursor = execute_query(conn, "SELECT id FROM users WHERE LOWER(username) = ?", (username,))
         if cursor.fetchone():
             return jsonify({"success": False, "message": f"El usuario '{username}' ya existe. Elija otro nombre."}), 400
 
         # Crear nuevo usuario con rol 'user'
         password_hash = generate_password_hash(password)
-        cursor.execute(
+        execute_query(
+            conn,
             "INSERT INTO users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, 'user', ?)",
             (username, password_hash, full_name, now_ar)
         )
-        user_id = cursor.lastrowid
 
         # Iniciar sesión automáticamente
         session.permanent = True
         session['username'] = username
         session['full_name'] = full_name
         session['role'] = 'user'
-        session['user_id'] = user_id
 
         # Registrar auditoría
-        cursor.execute("""
+        execute_query(conn, """
             INSERT INTO audit_logs (username, role, login_time, ip_address, user_agent, status, details)
             VALUES (?, 'user', ?, ?, ?, 'EXITOSO', 'Registro inicial y primer ingreso')
         """, (username, now_ar, ip, ua))
@@ -219,7 +276,6 @@ def api_register():
 
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
-    username = session.get('username', 'anon')
     session.clear()
     return jsonify({"success": True, "message": "Sesión finalizada correctamente."})
 
@@ -258,8 +314,7 @@ def api_audit_logs():
     params.append(limit)
 
     with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute(query, params)
+        cursor = execute_query(conn, query, params)
         rows = cursor.fetchall()
 
         logs = []
@@ -276,12 +331,12 @@ def api_audit_logs():
             })
 
         # Estadísticas generales
-        cursor.execute("SELECT COUNT(*) FROM audit_logs WHERE status = 'EXITOSO'")
-        total_exitosos = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM audit_logs WHERE status = 'FALLIDO'")
-        total_fallidos = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(DISTINCT username) FROM audit_logs WHERE status = 'EXITOSO'")
-        usuarios_unicos = cursor.fetchone()[0]
+        c1 = execute_query(conn, "SELECT COUNT(*) FROM audit_logs WHERE status = 'EXITOSO'")
+        total_exitosos = get_scalar(c1)
+        c2 = execute_query(conn, "SELECT COUNT(*) FROM audit_logs WHERE status = 'FALLIDO'")
+        total_fallidos = get_scalar(c2)
+        c3 = execute_query(conn, "SELECT COUNT(DISTINCT username) FROM audit_logs WHERE status = 'EXITOSO'")
+        usuarios_unicos = get_scalar(c3)
 
         return jsonify({
             "success": True,
@@ -297,8 +352,7 @@ def api_audit_logs():
 @admin_required
 def api_export_logs():
     with get_db() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, username, role, login_time, ip_address, user_agent, status, details FROM audit_logs ORDER BY id DESC")
+        cursor = execute_query(conn, "SELECT id, username, role, login_time, ip_address, user_agent, status, details FROM audit_logs ORDER BY id DESC")
         rows = cursor.fetchall()
 
     output = io.StringIO()
@@ -322,8 +376,7 @@ def api_export_logs():
 def api_users():
     if request.method == 'GET':
         with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, username, full_name, role, created_at FROM users ORDER BY username ASC")
+            cursor = execute_query(conn, "SELECT id, username, full_name, role, created_at FROM users ORDER BY username ASC")
             users = [dict(r) for r in cursor.fetchall()]
             return jsonify({"success": True, "users": users})
     else:
@@ -337,12 +390,12 @@ def api_users():
             return jsonify({"success": False, "message": "Faltan campos obligatorios."}), 400
 
         with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id FROM users WHERE LOWER(username) = ?", (username,))
+            cursor = execute_query(conn, "SELECT id FROM users WHERE LOWER(username) = ?", (username,))
             if cursor.fetchone():
                 return jsonify({"success": False, "message": "El usuario ya existe."}), 400
             
-            cursor.execute(
+            execute_query(
+                conn,
                 "INSERT INTO users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, ?, ?)",
                 (username, generate_password_hash(password), full_name, role, get_now_ar())
             )
@@ -361,24 +414,23 @@ def api_reset_password():
         return jsonify({"success": False, "message": "Datos incompletos. Ingrese usuario y nueva contraseña."}), 400
 
     with get_db() as conn:
-        cursor = conn.cursor()
         if user_id:
-            cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+            cursor = execute_query(conn, "SELECT * FROM users WHERE id = ?", (user_id,))
         else:
-            cursor.execute("SELECT * FROM users WHERE LOWER(username) = ?", (username,))
+            cursor = execute_query(conn, "SELECT * FROM users WHERE LOWER(username) = ?", (username,))
         user = cursor.fetchone()
 
         if not user:
             return jsonify({"success": False, "message": "Usuario no encontrado."}), 404
 
         new_hash = generate_password_hash(new_password)
-        cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user['id']))
+        execute_query(conn, "UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user['id']))
 
         # Registrar en la auditoría la acción del admin
         now_ar = get_now_ar()
         ip = get_client_ip()
         admin_user = session.get('username', 'admin')
-        cursor.execute("""
+        execute_query(conn, """
             INSERT INTO audit_logs (username, role, login_time, ip_address, user_agent, status, details)
             VALUES (?, 'admin', ?, ?, 'Admin Action', 'EXITOSO', ?)
         """, (admin_user, now_ar, ip, f"Blanqueó contraseña de usuario '{user['username']}'"))
@@ -393,20 +445,6 @@ def api_reset_password():
 # ==============================================================================
 # RUTAS ESTÁTICAS Y DASHBOARD
 # ==============================================================================
-@app.route('/')
-@login_required
-def index():
-    return send_from_directory(BASE_DIR, 'index.html')
-
-@app.route('/login')
-@app.route('/login.html')
-def login_page():
-    if 'username' in session:
-        return redirect('/')
-    return send_from_directory(BASE_DIR, 'login.html')
-
-import gzip
-
 def ensure_gzip_data():
     json_path = os.path.join(BASE_DIR, 'data.json')
     gz_path = os.path.join(BASE_DIR, 'data.json.gz')
@@ -418,6 +456,18 @@ def ensure_gzip_data():
                         f_out.write(f_in.read())
             except Exception as e:
                 print("Aviso al comprimir data.json:", e)
+
+@app.route('/')
+@login_required
+def index():
+    return send_from_directory(BASE_DIR, 'index.html')
+
+@app.route('/login')
+@app.route('/login.html')
+def login_page():
+    if 'username' in session:
+        return redirect('/')
+    return send_from_directory(BASE_DIR, 'login.html')
 
 @app.route('/data.json')
 @login_required
@@ -439,7 +489,6 @@ def get_metadata_json():
 
 @app.route('/<path:filename>')
 def serve_static(filename):
-    # Proteger index.html y data.json si se acceden directamente por ruta
     if filename in ['index.html', 'data.json'] and 'username' not in session:
         return redirect('/login.html')
     return send_from_directory(BASE_DIR, filename)
