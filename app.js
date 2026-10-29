@@ -1244,33 +1244,18 @@ async function syncDatabase() {
     // Iniciar loading
     btnSync.disabled = true;
     syncIcon.classList.add('spinning');
-    updateStatusIndicator('orange', 'Sincronizando con base de datos...');
-    showToast('Iniciando sincronización con SQL Server en vivo...');
+    updateStatusIndicator('orange', 'Actualizando datos...');
+    showToast('Actualizando datos del visualizador...');
     
     try {
-        // Consumir el endpoint /api/sync expuesto por server.py
-        const response = await fetch('/api/sync');
-        if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.message || 'Error en la sincronización del servidor.');
-        }
-        
-        const data = await response.json();
-        
-        showToast(`¡Sincronización Exitosa! Se cargaron ${data.records.toLocaleString('es-AR')} registros.`, 'success');
-        
-        // Recargar los datos del JSON recién escrito
+        // Recargar los datos directamente evitando cualquier caché
         await loadDashboardData();
-        
+        showToast(`¡Datos actualizados con éxito! Se cargaron ${allRecords.length.toLocaleString('es-AR')} registros.`, 'success');
+        updateStatusIndicator('green', 'Base de Datos En Vivo');
     } catch (error) {
-        console.error('Error al sincronizar:', error);
-        showToast(`Sincronización Fallida. Usando datos de respaldo.`, 'error');
-        // Asegurar que el estado vuelva a verde si tenemos datos cargados, de lo contrario rojo
-        if (allRecords.length > 0) {
-            updateStatusIndicator('green', 'Base de Datos - Desconectado (Usando respaldo)');
-        } else {
-            updateStatusIndicator('red', 'Error de conexión y sin datos');
-        }
+        console.error('Error al actualizar datos:', error);
+        showToast(`Error al actualizar los datos.`, 'error');
+        updateStatusIndicator('red', 'Error al cargar datos');
     } finally {
         // Detener loading
         btnSync.disabled = false;
@@ -1416,10 +1401,15 @@ async function checkAuthSession() {
             document.getElementById('current-user-name').textContent = displayName;
             document.getElementById('current-user-role').textContent = subLabel;
             
-            // Si es admin, habilitar botón de Auditoría de Accesos
+            // Si es admin, habilitar botón de Auditoría de Accesos y botón de Actualizar Datos
+            const btnAdmin = document.getElementById('btn-open-audit-logs');
+            const btnSync = document.getElementById('btn-sync-db');
             if (data.role === 'admin') {
-                const btnAdmin = document.getElementById('btn-open-audit-logs');
                 if (btnAdmin) btnAdmin.style.display = 'inline-flex';
+                if (btnSync) btnSync.style.display = 'inline-flex';
+            } else {
+                if (btnAdmin) btnAdmin.style.display = 'none';
+                if (btnSync) btnSync.style.display = 'none';
             }
         }
     } catch (e) {

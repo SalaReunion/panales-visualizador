@@ -73,7 +73,7 @@
                     <i data-lucide="log-out"></i>
                     <span>Salir</span>
                 </button>
-                <button class="btn btn-sync" id="btn-sync-db" title="Actualizar datos desde base de datos">
+                <button class="btn btn-sync" id="btn-sync-db" style="display: none;" title="Actualizar datos desde base de datos">
                     <i data-lucide="refresh-cw" class="icon-spin-hover" id="sync-icon"></i>
                     <span>Actualizar Datos</span>
                 </button>
@@ -482,6 +482,10 @@
                             </div>
                         </div>
                         <div class="modal-actions">
+                            <button class="btn btn-add-user btn-sm" id="btn-open-create-user" style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <i data-lucide="user-plus"></i>
+                                <span>Nuevo Usuario</span>
+                            </button>
                             <button class="btn btn-sync btn-sm" id="btn-refresh-users">
                                 <i data-lucide="refresh-cw"></i>
                                 <span>Actualizar Lista</span>
