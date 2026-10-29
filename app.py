@@ -154,6 +154,63 @@ def api_login():
 
             return jsonify({"success": False, "message": "Usuario o contraseña incorrectos."}), 401
 
+@app.route('/api/register', methods=['POST'])
+def api_register():
+    data = request.get_json() or {}
+    full_name = (data.get('full_name') or '').strip()
+    username = (data.get('username') or '').strip().lower()
+    password = data.get('password') or ''
+    ip = get_client_ip()
+    ua = request.headers.get('User-Agent', '')[:250]
+    now_ar = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    if not full_name or not username or not password:
+        return jsonify({"success": False, "message": "Por favor complete todos los campos requeridos."}), 400
+
+    if len(username) < 3:
+        return jsonify({"success": False, "message": "El nombre de usuario debe tener al menos 3 caracteres."}), 400
+
+    if len(password) < 4:
+        return jsonify({"success": False, "message": "La contraseña debe tener al menos 4 caracteres."}), 400
+
+    with get_db() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE LOWER(username) = ?", (username,))
+        if cursor.fetchone():
+            return jsonify({"success": False, "message": f"El usuario '{username}' ya existe. Elija otro nombre."}), 400
+
+        # Crear nuevo usuario con rol 'user'
+        password_hash = generate_password_hash(password)
+        cursor.execute(
+            "INSERT INTO users (username, password_hash, full_name, role) VALUES (?, ?, ?, 'user')",
+            (username, password_hash, full_name)
+        )
+        user_id = cursor.lastrowid
+
+        # Iniciar sesión automáticamente
+        session.permanent = True
+        session['username'] = username
+        session['full_name'] = full_name
+        session['role'] = 'user'
+        session['user_id'] = user_id
+
+        # Registrar auditoría
+        cursor.execute("""
+            INSERT INTO audit_logs (username, role, login_time, ip_address, user_agent, status, details)
+            VALUES (?, 'user', ?, ?, ?, 'EXITOSO', 'Registro inicial y primer ingreso')
+        """, (username, now_ar, ip, ua))
+        conn.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Registro exitoso",
+            "user": {
+                "username": username,
+                "full_name": full_name,
+                "role": "user"
+            }
+        })
+
 @app.route('/api/logout', methods=['POST'])
 def api_logout():
     username = session.get('username', 'anon')

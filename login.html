@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ingreso - Control de Pañales</title>
+    <title>Acceso - Control de Pañales</title>
     <!-- Google Fonts: Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -54,8 +54,8 @@
             border: 1px solid var(--border-color);
             border-radius: var(--radius-lg);
             width: 100%;
-            max-width: 440px;
-            padding: 40px 36px;
+            max-width: 450px;
+            padding: 36px 32px;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6), 0 0 40px rgba(6, 182, 212, 0.1);
             backdrop-filter: blur(12px);
             animation: fadeIn 0.4s ease-out;
@@ -68,13 +68,13 @@
 
         .login-header {
             text-align: center;
-            margin-bottom: 32px;
+            margin-bottom: 24px;
         }
 
         .logo-badge {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 16px;
+            width: 58px;
+            height: 58px;
+            margin: 0 auto 14px;
             background: linear-gradient(135deg, var(--accent), #0284c7);
             border-radius: var(--radius-md);
             display: flex;
@@ -85,35 +85,75 @@
 
         .logo-badge i {
             color: #fff;
-            width: 32px;
-            height: 32px;
+            width: 28px;
+            height: 28px;
         }
 
         .login-header h1 {
-            font-size: 1.75rem;
+            font-size: 1.65rem;
             font-weight: 700;
             letter-spacing: -0.5px;
             background: linear-gradient(to right, #ffffff, #cbd5e1);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
         }
 
         .login-header p {
             color: var(--text-muted);
+            font-size: 0.88rem;
+        }
+
+        /* Selector de Pestañas (Iniciar Sesión vs Registrarse) */
+        .auth-nav-tabs {
+            display: flex;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 4px;
+            margin-bottom: 24px;
+        }
+
+        .auth-tab-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px 14px;
+            font-family: inherit;
             font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .auth-tab-btn.active {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(2, 132, 199, 0.2));
+            color: #fff;
+            border: 1px solid rgba(6, 182, 212, 0.4);
+            font-weight: 600;
+        }
+
+        .auth-tab-btn i {
+            width: 15px;
+            height: 15px;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         .form-label {
             display: block;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             font-weight: 500;
             color: var(--text-muted);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
         .input-wrapper {
@@ -137,10 +177,10 @@
             background: rgba(15, 23, 42, 0.7);
             border: 1px solid var(--border-color);
             border-radius: var(--radius-md);
-            padding: 12px 14px 12px 44px;
+            padding: 11px 14px 11px 44px;
             color: var(--text-main);
             font-family: inherit;
-            font-size: 0.95rem;
+            font-size: 0.92rem;
             transition: all 0.2s ease;
             outline: none;
         }
@@ -183,10 +223,10 @@
             background: linear-gradient(135deg, var(--accent), #0284c7);
             border: none;
             border-radius: var(--radius-md);
-            padding: 14px 20px;
+            padding: 13px 20px;
             color: #fff;
             font-family: inherit;
-            font-size: 1rem;
+            font-size: 0.96rem;
             font-weight: 600;
             cursor: pointer;
             display: flex;
@@ -195,7 +235,7 @@
             gap: 10px;
             box-shadow: 0 4px 15px rgba(6, 182, 212, 0.3);
             transition: all 0.2s ease;
-            margin-top: 10px;
+            margin-top: 14px;
         }
 
         .btn-submit:hover {
@@ -216,10 +256,10 @@
 
         .alert-box {
             display: none;
-            padding: 12px 14px;
+            padding: 11px 14px;
             border-radius: var(--radius-md);
             font-size: 0.85rem;
-            margin-bottom: 20px;
+            margin-bottom: 18px;
             align-items: center;
             gap: 10px;
             animation: fadeIn 0.3s;
@@ -238,26 +278,36 @@
             flex-shrink: 0;
         }
 
-        .login-footer {
-            margin-top: 32px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border-color);
+        .alert-success {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #86efac;
+        }
+
+        .alert-success i {
+            color: var(--color-success);
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+        }
+
+        .switch-mode-text {
             text-align: center;
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
         }
 
-        .audit-notice {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            font-size: 0.75rem;
-            color: var(--text-dark);
-        }
-
-        .audit-notice i {
-            width: 14px;
-            height: 14px;
+        .switch-mode-text a {
             color: var(--accent);
+            text-decoration: none;
+            font-weight: 600;
+            margin-left: 4px;
+            cursor: pointer;
+        }
+
+        .switch-mode-text a:hover {
+            text-decoration: underline;
         }
 
         /* Spinner */
@@ -282,16 +332,38 @@
             <div class="logo-badge">
                 <i data-lucide="package"></i>
             </div>
-            <h1>Control de Pañales</h1>
-            <p>Ingreso seguro al sistema de visualización</p>
+            <h1 id="header-title">Control de Pañales</h1>
+            <p id="header-desc">Ingreso seguro al sistema de visualización</p>
+        </div>
+
+        <!-- Pestañas de Selección: Iniciar Sesión vs Registrarse -->
+        <div class="auth-nav-tabs">
+            <button type="button" class="auth-tab-btn active" id="tab-login">
+                <i data-lucide="log-in"></i>
+                <span>Iniciar Sesión</span>
+            </button>
+            <button type="button" class="auth-tab-btn" id="tab-register">
+                <i data-lucide="user-plus"></i>
+                <span>Registrarse</span>
+            </button>
         </div>
 
         <div id="alert-box" class="alert-box alert-error">
-            <i data-lucide="alert-circle"></i>
-            <span id="alert-message">Usuario o contraseña incorrectos</span>
+            <i data-lucide="alert-circle" id="alert-icon"></i>
+            <span id="alert-message">Mensaje</span>
         </div>
 
-        <form id="login-form">
+        <form id="auth-form">
+            <!-- Campo Nombre Completo (Solo visible en Registrarse) -->
+            <div class="form-group" id="group-fullname" style="display: none;">
+                <label class="form-label" for="fullname">Nombre y Apellido</label>
+                <div class="input-wrapper">
+                    <input type="text" id="fullname" class="form-control" placeholder="Ej: María Gómez">
+                    <i data-lucide="badge-check" class="input-icon"></i>
+                </div>
+            </div>
+
+            <!-- Campo Usuario -->
             <div class="form-group">
                 <label class="form-label" for="username">Usuario</label>
                 <div class="input-wrapper">
@@ -300,6 +372,7 @@
                 </div>
             </div>
 
+            <!-- Campo Contraseña -->
             <div class="form-group">
                 <label class="form-label" for="password">Contraseña</label>
                 <div class="input-wrapper">
@@ -317,79 +390,139 @@
                 <i data-lucide="arrow-right" id="arrow-icon"></i>
             </button>
         </form>
+
+        <div class="switch-mode-text">
+            <span id="switch-prompt">¿No tienes cuenta?</span>
+            <a id="switch-link">Regístrate aquí</a>
+        </div>
     </div>
 
     <script>
         lucide.createIcons();
 
-        // Mostrar / ocultar contraseña
-        const btnTogglePass = document.getElementById('btn-toggle-password');
-        const passInput = document.getElementById('password');
-        const eyeIcon = document.getElementById('eye-icon');
+        // Modo actual: 'login' o 'register'
+        let currentMode = 'login';
 
-        btnTogglePass.addEventListener('click', () => {
-            const isPass = passInput.getAttribute('type') === 'password';
-            passInput.setAttribute('type', isPass ? 'text' : 'password');
-            eyeIcon.setAttribute('data-lucide', isPass ? 'eye-off' : 'eye');
-            lucide.createIcons();
-        });
-
-        // Enviar formulario de login
-        const form = document.getElementById('login-form');
-        const alertBox = document.getElementById('alert-box');
-        const alertMsg = document.getElementById('alert-message');
+        const tabLogin = document.getElementById('tab-login');
+        const tabRegister = document.getElementById('tab-register');
+        const headerDesc = document.getElementById('header-desc');
+        const groupFullname = document.getElementById('group-fullname');
+        const fullnameInput = document.getElementById('fullname');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
         const btnSubmit = document.getElementById('btn-submit');
         const btnText = document.getElementById('btn-text');
         const btnSpinner = document.getElementById('btn-spinner');
         const arrowIcon = document.getElementById('arrow-icon');
+        const switchPrompt = document.getElementById('switch-prompt');
+        const switchLink = document.getElementById('switch-link');
+        const alertBox = document.getElementById('alert-box');
+        const alertMsg = document.getElementById('alert-message');
+        const alertIcon = document.getElementById('alert-icon');
+
+        function setMode(mode) {
+            currentMode = mode;
+            alertBox.style.display = 'none';
+
+            if (mode === 'login') {
+                tabLogin.classList.add('active');
+                tabRegister.classList.remove('active');
+                headerDesc.textContent = 'Ingreso seguro al sistema de visualización';
+                groupFullname.style.display = 'none';
+                fullnameInput.required = false;
+                btnText.textContent = 'Ingresar al Sistema';
+                switchPrompt.textContent = '¿No tienes cuenta?';
+                switchLink.textContent = 'Regístrate aquí';
+            } else {
+                tabRegister.classList.add('active');
+                tabLogin.classList.remove('active');
+                headerDesc.textContent = 'Crea tu usuario para acceder al sistema';
+                groupFullname.style.display = 'block';
+                fullnameInput.required = true;
+                btnText.textContent = 'Crear Cuenta e Ingresar';
+                switchPrompt.textContent = '¿Ya tienes una cuenta?';
+                switchLink.textContent = 'Inicia sesión';
+            }
+            lucide.createIcons();
+        }
+
+        tabLogin.addEventListener('click', () => setMode('login'));
+        tabRegister.addEventListener('click', () => setMode('register'));
+        switchLink.addEventListener('click', () => setMode(currentMode === 'login' ? 'register' : 'login'));
+
+        // Mostrar / ocultar contraseña
+        const btnTogglePass = document.getElementById('btn-toggle-password');
+        const eyeIcon = document.getElementById('eye-icon');
+
+        btnTogglePass.addEventListener('click', () => {
+            const isPass = passwordInput.getAttribute('type') === 'password';
+            passwordInput.setAttribute('type', isPass ? 'text' : 'password');
+            eyeIcon.setAttribute('data-lucide', isPass ? 'eye-off' : 'eye');
+            lucide.createIcons();
+        });
+
+        // Enviar Formulario
+        const form = document.getElementById('auth-form');
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             alertBox.style.display = 'none';
 
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value;
+            const username = usernameInput.value.trim();
+            const password = passwordInput.value;
+            const fullName = fullnameInput.value.trim();
 
             if (!username || !password) return;
+            if (currentMode === 'register' && !fullName) return;
 
-            // Estado cargando
+            // Estado de carga
             btnSubmit.disabled = true;
-            btnText.textContent = 'Verificando...';
+            btnText.textContent = currentMode === 'login' ? 'Verificando...' : 'Creando cuenta...';
             btnSpinner.style.display = 'inline-block';
             arrowIcon.style.display = 'none';
 
+            const endpoint = currentMode === 'login' ? '/api/login' : '/api/register';
+            const payload = currentMode === 'login' 
+                ? { username, password }
+                : { username, password, full_name: fullName };
+
             try {
-                const res = await fetch('/api/login', {
+                const res = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
+                    body: JSON.stringify(payload)
                 });
 
                 const data = await res.json();
 
                 if (res.ok && data.success) {
                     btnText.textContent = 'Acceso concedido';
-                    // Redirigir al visualizador
+                    // Redirigir directamente al visualizador
                     window.location.href = '/';
                 } else {
-                    alertMsg.textContent = data.message || 'Usuario o contraseña incorrectos.';
-                    alertBox.style.display = 'flex';
-                    btnSubmit.disabled = false;
-                    btnText.textContent = 'Ingresar al Sistema';
-                    btnSpinner.style.display = 'none';
-                    arrowIcon.style.display = 'inline-block';
-                    passInput.value = '';
-                    passInput.focus();
+                    showAlert(data.message || 'Ocurrió un error inesperado.', 'error');
+                    resetSubmitButton();
                 }
             } catch (err) {
-                alertMsg.textContent = 'Error de conexión con el servidor. Reintente.';
-                alertBox.style.display = 'flex';
-                btnSubmit.disabled = false;
-                btnText.textContent = 'Ingresar al Sistema';
-                btnSpinner.style.display = 'none';
-                arrowIcon.style.display = 'inline-block';
+                showAlert('Error de conexión con el servidor. Reintente.', 'error');
+                resetSubmitButton();
             }
         });
+
+        function showAlert(msg, type = 'error') {
+            alertMsg.textContent = msg;
+            alertBox.className = 'alert-box ' + (type === 'success' ? 'alert-success' : 'alert-error');
+            alertIcon.setAttribute('data-lucide', type === 'success' ? 'check-circle' : 'alert-circle');
+            alertBox.style.display = 'flex';
+            lucide.createIcons();
+        }
+
+        function resetSubmitButton() {
+            btnSubmit.disabled = false;
+            btnText.textContent = currentMode === 'login' ? 'Ingresar al Sistema' : 'Crear Cuenta e Ingresar';
+            btnSpinner.style.display = 'none';
+            arrowIcon.style.display = 'inline-block';
+        }
     </script>
 </body>
 </html>
