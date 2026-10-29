@@ -111,7 +111,7 @@ async function loadDashboardData() {
             document.getElementById('btn-sync-db').style.display = 'none';
             updateStatusIndicator('green', 'Red Compartida (Lectura)');
         } else {
-            updateStatusIndicator('green', 'Base de Datos (belgdbpa) En Vivo');
+            updateStatusIndicator('green', 'Base de Datos En Vivo');
         }
         
         // Inicializar filtros y visualizaciones
@@ -1267,7 +1267,7 @@ async function syncDatabase() {
         showToast(`Sincronización Fallida. Usando datos de respaldo.`, 'error');
         // Asegurar que el estado vuelva a verde si tenemos datos cargados, de lo contrario rojo
         if (allRecords.length > 0) {
-            updateStatusIndicator('green', 'Base de Datos (belgdbpa) - Desconectado (Usando respaldo)');
+            updateStatusIndicator('green', 'Base de Datos - Desconectado (Usando respaldo)');
         } else {
             updateStatusIndicator('red', 'Error de conexión y sin datos');
         }
