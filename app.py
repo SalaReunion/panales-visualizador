@@ -79,7 +79,7 @@ def init_db():
         if is_postgres():
             print("Conectado a PostgreSQL persistente en la nube...")
             execute_query(conn, """
-                CREATE TABLE IF NOT EXISTS users (
+                CREATE TABLE IF NOT EXISTS panales_users (
                     id SERIAL PRIMARY KEY,
                     username VARCHAR(100) UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL,
@@ -89,7 +89,7 @@ def init_db():
                 )
             """)
             execute_query(conn, """
-                CREATE TABLE IF NOT EXISTS audit_logs (
+                CREATE TABLE IF NOT EXISTS panales_audit_logs (
                     id SERIAL PRIMARY KEY,
                     username VARCHAR(100) NOT NULL,
                     role VARCHAR(50),
@@ -102,7 +102,7 @@ def init_db():
             """)
         else:
             execute_query(conn, """
-                CREATE TABLE IF NOT EXISTS users (
+                CREATE TABLE IF NOT EXISTS panales_users (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL,
@@ -112,7 +112,7 @@ def init_db():
                 )
             """)
             execute_query(conn, """
-                CREATE TABLE IF NOT EXISTS audit_logs (
+                CREATE TABLE IF NOT EXISTS panales_audit_logs (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     username TEXT NOT NULL,
                     role TEXT,
@@ -124,7 +124,7 @@ def init_db():
                 )
             """)
 
-        cur = execute_query(conn, "SELECT COUNT(*) FROM users")
+        cur = execute_query(conn, "SELECT COUNT(*) FROM panales_users")
         if get_scalar(cur) == 0:
             now_str = get_now_ar()
             default_users = [
@@ -133,7 +133,7 @@ def init_db():
             for u in default_users:
                 execute_query(
                     conn,
-                    "INSERT INTO users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, ?, ?)",
+                    "INSERT INTO panales_users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, ?, ?)",
                     u
                 )
             print("Usuario inicial creado: admin (admin2026) con hora de Buenos Aires")
@@ -183,7 +183,7 @@ def api_login():
         return jsonify({"success": False, "message": "Por favor complete usuario y contraseña."}), 400
 
     with get_db() as conn:
-        cursor = execute_query(conn, "SELECT * FROM users WHERE LOWER(username) = ?", (username,))
+        cursor = execute_query(conn, "SELECT * FROM panales_users WHERE LOWER(username) = ?", (username,))
         user = cursor.fetchone()
 
         if user and check_password_hash(user['password_hash'], password):
@@ -195,7 +195,7 @@ def api_login():
 
             # Registrar log de auditoría EXITOSO
             execute_query(conn, """
-                INSERT INTO audit_logs (username, role, login_time, ip_address, user_agent, status, details)
+                INSERT INTO panales_audit_logs (username, role, login_time, ip_address, user_agent, status, details)
                 VALUES (?, ?, ?, ?, ?, 'EXITOSO', 'Ingreso correcto al sistema')
             """, (user['username'], user['role'], now_ar, ip, ua))
             conn.commit()
@@ -212,7 +212,7 @@ def api_login():
         else:
             # Registrar intento FALLIDO
             execute_query(conn, """
-                INSERT INTO audit_logs (username, role, login_time, ip_address, user_agent, status, details)
+                INSERT INTO panales_audit_logs (username, role, login_time, ip_address, user_agent, status, details)
                 VALUES (?, ?, ?, ?, ?, 'FALLIDO', 'Contraseña incorrecta o usuario inexistente')
             """, (username, 'desconocido', now_ar, ip, ua))
             conn.commit()
@@ -239,7 +239,7 @@ def api_register():
         return jsonify({"success": False, "message": "La contraseña debe tener al menos 4 caracteres."}), 400
 
     with get_db() as conn:
-        cursor = execute_query(conn, "SELECT id FROM users WHERE LOWER(username) = ?", (username,))
+        cursor = execute_query(conn, "SELECT id FROM panales_users WHERE LOWER(username) = ?", (username,))
         if cursor.fetchone():
             return jsonify({"success": False, "message": f"El usuario '{username}' ya existe. Elija otro nombre."}), 400
 
@@ -247,7 +247,7 @@ def api_register():
         password_hash = generate_password_hash(password)
         execute_query(
             conn,
-            "INSERT INTO users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, 'user', ?)",
+            "INSERT INTO panales_users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, 'user', ?)",
             (username, password_hash, full_name, now_ar)
         )
 
@@ -259,7 +259,7 @@ def api_register():
 
         # Registrar auditoría
         execute_query(conn, """
-            INSERT INTO audit_logs (username, role, login_time, ip_address, user_agent, status, details)
+            INSERT INTO panales_audit_logs (username, role, login_time, ip_address, user_agent, status, details)
             VALUES (?, 'user', ?, ?, ?, 'EXITOSO', 'Registro inicial y primer ingreso')
         """, (username, now_ar, ip, ua))
         conn.commit()
@@ -300,7 +300,7 @@ def api_audit_logs():
     search = (request.args.get('search') or '').strip().lower()
     status = (request.args.get('status') or '').strip().upper()
 
-    query = "SELECT * FROM audit_logs WHERE 1=1"
+    query = "SELECT * FROM panales_audit_logs WHERE 1=1"
     params = []
 
     if search:
@@ -331,11 +331,11 @@ def api_audit_logs():
             })
 
         # Estadísticas generales
-        c1 = execute_query(conn, "SELECT COUNT(*) FROM audit_logs WHERE status = 'EXITOSO'")
+        c1 = execute_query(conn, "SELECT COUNT(*) FROM panales_audit_logs WHERE status = 'EXITOSO'")
         total_exitosos = get_scalar(c1)
-        c2 = execute_query(conn, "SELECT COUNT(*) FROM audit_logs WHERE status = 'FALLIDO'")
+        c2 = execute_query(conn, "SELECT COUNT(*) FROM panales_audit_logs WHERE status = 'FALLIDO'")
         total_fallidos = get_scalar(c2)
-        c3 = execute_query(conn, "SELECT COUNT(DISTINCT username) FROM audit_logs WHERE status = 'EXITOSO'")
+        c3 = execute_query(conn, "SELECT COUNT(DISTINCT username) FROM panales_audit_logs WHERE status = 'EXITOSO'")
         usuarios_unicos = get_scalar(c3)
 
         return jsonify({
@@ -352,7 +352,7 @@ def api_audit_logs():
 @admin_required
 def api_export_logs():
     with get_db() as conn:
-        cursor = execute_query(conn, "SELECT id, username, role, login_time, ip_address, user_agent, status, details FROM audit_logs ORDER BY id DESC")
+        cursor = execute_query(conn, "SELECT id, username, role, login_time, ip_address, user_agent, status, details FROM panales_audit_logs ORDER BY id DESC")
         rows = cursor.fetchall()
 
     output = io.StringIO()
@@ -376,7 +376,7 @@ def api_export_logs():
 def api_users():
     if request.method == 'GET':
         with get_db() as conn:
-            cursor = execute_query(conn, "SELECT id, username, full_name, role, created_at FROM users ORDER BY username ASC")
+            cursor = execute_query(conn, "SELECT id, username, full_name, role, created_at FROM panales_users ORDER BY username ASC")
             users = [dict(r) for r in cursor.fetchall()]
             return jsonify({"success": True, "users": users})
     else:
@@ -390,13 +390,13 @@ def api_users():
             return jsonify({"success": False, "message": "Faltan campos obligatorios."}), 400
 
         with get_db() as conn:
-            cursor = execute_query(conn, "SELECT id FROM users WHERE LOWER(username) = ?", (username,))
+            cursor = execute_query(conn, "SELECT id FROM panales_users WHERE LOWER(username) = ?", (username,))
             if cursor.fetchone():
                 return jsonify({"success": False, "message": "El usuario ya existe."}), 400
             
             execute_query(
                 conn,
-                "INSERT INTO users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO panales_users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, ?, ?)",
                 (username, generate_password_hash(password), full_name, role, get_now_ar())
             )
             conn.commit()
@@ -415,23 +415,23 @@ def api_reset_password():
 
     with get_db() as conn:
         if user_id:
-            cursor = execute_query(conn, "SELECT * FROM users WHERE id = ?", (user_id,))
+            cursor = execute_query(conn, "SELECT * FROM panales_users WHERE id = ?", (user_id,))
         else:
-            cursor = execute_query(conn, "SELECT * FROM users WHERE LOWER(username) = ?", (username,))
+            cursor = execute_query(conn, "SELECT * FROM panales_users WHERE LOWER(username) = ?", (username,))
         user = cursor.fetchone()
 
         if not user:
             return jsonify({"success": False, "message": "Usuario no encontrado."}), 404
 
         new_hash = generate_password_hash(new_password)
-        execute_query(conn, "UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user['id']))
+        execute_query(conn, "UPDATE panales_users SET password_hash = ? WHERE id = ?", (new_hash, user['id']))
 
         # Registrar en la auditoría la acción del admin
         now_ar = get_now_ar()
         ip = get_client_ip()
         admin_user = session.get('username', 'admin')
         execute_query(conn, """
-            INSERT INTO audit_logs (username, role, login_time, ip_address, user_agent, status, details)
+            INSERT INTO panales_audit_logs (username, role, login_time, ip_address, user_agent, status, details)
             VALUES (?, 'admin', ?, ?, 'Admin Action', 'EXITOSO', ?)
         """, (admin_user, now_ar, ip, f"Blanqueó contraseña de usuario '{user['username']}'"))
 
