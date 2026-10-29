@@ -1,3 +1,14 @@
+function formatFechaAr(dateStr) {
+    if (!dateStr) return '-';
+    try {
+        const parts = dateStr.trim().split(' ');
+        if (parts.length === 2 && parts[0].includes('-')) {
+            const d = parts[0].split('-');
+            return `${d[2]}/${d[1]}/${d[0]} ${parts[1]}`;
+        }
+    } catch(e) {}
+    return dateStr;
+}
 /* ==========================================================================
    DASHBOARD STATE & CONFIGURATION
    ========================================================================== */
@@ -1399,8 +1410,11 @@ async function checkAuthSession() {
         if (res.ok) {
             const data = await res.json();
             currentUser = data;
-            document.getElementById('current-user-name').textContent = data.full_name || data.username;
-            document.getElementById('current-user-role').textContent = data.role === 'admin' ? 'Administrador' : 'Operador';
+            const roleLabel = data.role === 'admin' ? 'Administrador' : 'Operador';
+            const displayName = data.full_name ? data.full_name : `@${data.username}`;
+            const subLabel = `@${data.username} • ${roleLabel}`;
+            document.getElementById('current-user-name').textContent = displayName;
+            document.getElementById('current-user-role').textContent = subLabel;
             
             // Si es admin, habilitar botón de Auditoría de Accesos
             if (data.role === 'admin') {
@@ -1451,6 +1465,46 @@ function setupAuthAndAuditListeners() {
     }
     if (btnRefreshUsers) {
         btnRefreshUsers.addEventListener('click', loadUsers);
+    }
+
+    // Botón Crear Nuevo Usuario
+    const btnCreateUser = document.getElementById('btn-open-create-user');
+    if (btnCreateUser) {
+        btnCreateUser.addEventListener('click', async () => {
+            const username = prompt("Ingrese el nombre de usuario (ejemplo: maria):");
+            if (!username || !username.trim()) return;
+
+            const fullName = prompt(`Ingrese el nombre y apellido para "${username.trim()}":`, "Operador de Pañales");
+            if (!fullName || !fullName.trim()) return;
+
+            const password = prompt(`Ingrese la contraseña para "${username.trim()}":`, "panales2026");
+            if (!password || !password.trim()) return;
+
+            const esAdmin = confirm(`¿"${username.trim()}" debe ser ADMINISTRADOR?\n\n- Aceptar = Administrador\n- Cancelar = Operador estándar`);
+            const role = esAdmin ? 'admin' : 'user';
+
+            try {
+                const res = await fetch('/api/admin/users', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        username: username.trim().toLowerCase(),
+                        full_name: fullName.trim(),
+                        password: password.trim(),
+                        role: role
+                    })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showToast(`¡Usuario "${username.trim()}" creado exitosamente!`, 'success');
+                    loadUsers();
+                } else {
+                    alert(data.message || 'Error al crear el usuario.');
+                }
+            } catch (err) {
+                alert('Error de conexión al crear usuario.');
+            }
+        });
     }
 
     // Cerrar Sesión
@@ -1673,7 +1727,7 @@ function renderUsersTable() {
                 </td>
                 <td style="font-weight: 500;">${u.full_name || '-'}</td>
                 <td>${roleLabel}</td>
-                <td style="font-size: 0.8rem; color: #94a3b8;">${u.created_at || '-'}</td>
+                <td style="font-size: 0.8rem; color: #94a3b8;">${formatFechaAr(u.created_at)}</td>
                 <td style="text-align: right;">
                     <button class="btn btn-reset-key" onclick="blanquearClave(${u.id}, '${u.username}')" title="Asignar una nueva clave para este usuario">
                         <i data-lucide="key-round"></i>

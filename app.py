@@ -20,6 +20,13 @@ app.config['PERMANENT_SESSION_LIFETIME'] = datetime.timedelta(days=7)
 
 DB_PATH = os.path.join(BASE_DIR, "auth.db")
 
+# Zona Horaria de Buenos Aires (UTC-3)
+TZ_AR = datetime.timezone(datetime.timedelta(hours=-3))
+
+def get_now_ar():
+    return datetime.datetime.now(TZ_AR).strftime("%Y-%m-%d %H:%M:%S")
+
+
 # ==============================================================================
 # BASE DE DATOS Y AUTENTICACIÓN
 # ==============================================================================
@@ -40,7 +47,7 @@ def init_db():
                 password_hash TEXT NOT NULL,
                 full_name TEXT NOT NULL,
                 role TEXT NOT NULL DEFAULT 'user',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TEXT NOT NULL
             )
         """)
         
@@ -50,7 +57,7 @@ def init_db():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL,
                 role TEXT,
-                login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                login_time TEXT NOT NULL,
                 ip_address TEXT,
                 user_agent TEXT,
                 status TEXT NOT NULL,
@@ -62,14 +69,13 @@ def init_db():
         cursor.execute("SELECT COUNT(*) FROM users")
         if cursor.fetchone()[0] == 0:
             default_users = [
-                ("admin", generate_password_hash("admin2026"), "Administrador del Sistema", "admin"),
-                ("operador", generate_password_hash("panales2026"), "Operador de Pañales", "user")
+                ("admin", generate_password_hash("admin2026"), "Administrador del Sistema", "admin", get_now_ar())
             ]
             cursor.executemany(
-                "INSERT INTO users (username, password_hash, full_name, role) VALUES (?, ?, ?, ?)",
+                "INSERT INTO users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, ?, ?)",
                 default_users
             )
-            print("Usuarios iniciales creados: admin (admin2026) y operador (panales2026)")
+            print("Usuario inicial creado: admin (admin2026) con hora de Buenos Aires")
         
         conn.commit()
 
@@ -111,7 +117,7 @@ def api_login():
     password = data.get('password') or ''
     ip = get_client_ip()
     ua = request.headers.get('User-Agent', '')[:250]
-    now_ar = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_ar = get_now_ar()
 
     if not username or not password:
         return jsonify({"success": False, "message": "Por favor complete usuario y contraseña."}), 400
@@ -162,7 +168,7 @@ def api_register():
     password = data.get('password') or ''
     ip = get_client_ip()
     ua = request.headers.get('User-Agent', '')[:250]
-    now_ar = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now_ar = get_now_ar()
 
     if not full_name or not username or not password:
         return jsonify({"success": False, "message": "Por favor complete todos los campos requeridos."}), 400
@@ -182,8 +188,8 @@ def api_register():
         # Crear nuevo usuario con rol 'user'
         password_hash = generate_password_hash(password)
         cursor.execute(
-            "INSERT INTO users (username, password_hash, full_name, role) VALUES (?, ?, ?, 'user')",
-            (username, password_hash, full_name)
+            "INSERT INTO users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, 'user', ?)",
+            (username, password_hash, full_name, now_ar)
         )
         user_id = cursor.lastrowid
 
@@ -337,8 +343,8 @@ def api_users():
                 return jsonify({"success": False, "message": "El usuario ya existe."}), 400
             
             cursor.execute(
-                "INSERT INTO users (username, password_hash, full_name, role) VALUES (?, ?, ?, ?)",
-                (username, generate_password_hash(password), full_name, role)
+                "INSERT INTO users (username, password_hash, full_name, role, created_at) VALUES (?, ?, ?, ?, ?)",
+                (username, generate_password_hash(password), full_name, role, get_now_ar())
             )
             conn.commit()
             return jsonify({"success": True, "message": f"Usuario {username} creado con éxito."})
@@ -369,7 +375,7 @@ def api_reset_password():
         cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user['id']))
 
         # Registrar en la auditoría la acción del admin
-        now_ar = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_ar = get_now_ar()
         ip = get_client_ip()
         admin_user = session.get('username', 'admin')
         cursor.execute("""
